@@ -1,0 +1,4 @@
+
+class FlightPathDuplicate(Exception):
+        pass
+        
