@@ -1,12 +1,14 @@
+from flight import Flight
 from flight_path_broken import FlightPathBroken
 from flight_path_duplicate import FlightPathDuplicate
+from airport import Airport
 
 class FlightPath:
-    def __init__(self, src_airport):
+    def __init__(self, src_airport: Airport) -> None:
         self.airports = [src_airport]
         self.flights = []
 
-    def add(self, dst_airport, via_flight):
+    def add(self, dst_airport: Airport, via_flight : Flight) -> None:
         if not self.airports[-1] == via_flight.src_code:
             raise FlightPathBroken
         if self.airports.count(dst_airport) > 0:

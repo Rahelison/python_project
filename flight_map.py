@@ -3,61 +3,99 @@ from airport import Airport
 from flight import Flight
 from flight_path import FlightPath
 
+def formatCsvString(text: str) -> str:
+    return text.replace('"', "").replace(" ", "")
+
 
 class FlightMap:
-    def __init__(self):
+    def __init__(self) -> None:
         self.airports = {}
         self.flights = {}
     
-    def import_airports(self, csv_file):
-        with open(csv_file, 'r') as f:
-            reader = csv.reader(f)
+    def import_airports(self, csv_file: str) -> None:
+
+        with open(csv_file, 'r') as file:
+            reader = csv.reader(file)
+
             for row in reader:
-                # On crée un objet Airport avec les données lues
-                airport = Airport(row[0], row[1], row[2], row[3])
-                # On ajoute l'aéroport à la collection d'aéroports
-                self.airports[row[0]] = airport
+
+                name, code, latitude, longitude = row
+
+                #formater les données récupérées
+                name, code = formatCsvString(name), formatCsvString(code)
+                latitude = float(formatCsvString(latitude))
+                longitude = float(formatCsvString(longitude))
+
+                airport = Airport(name, code, latitude, longitude)
+
+                self.__airports[code] = airport
     
-    def import_flights(self, csv_file):
-        with open(csv_file, 'r') as f:
-            reader = csv.reader(f)
+    def import_flights(self, csv_file: str) -> None:
+        with open(csv_file, 'r') as file:
+            reader = csv.reader(file)
+
             for row in reader:
-                # On créé un objet Flight avec les données lues
-                flight = Flight(row[0], row[1], float(row[2]))
-                # On ajoute le vol à la collection de vols
-                self.flights[(row[0])] = flight
+                origin, destination, duration = row
 
-    def airports(self):
-        return list(self.airports.values())
+                origin, destination = formatCsvString(origin), formatCsvString(destination)
 
-    def flights(self):
-        return list(self.flights.values())
+                try :
+                    duration = float(duration)
+                except ValueError:
+                    print('Something wrong on the CSV file')
+                    continue
 
-    def airport_find(self, airport_code):
+                flight = Flight(origin, destination, duration)
+                self.__flights.append(flight)
+
+    def airports(self) -> list[Airport]:
+        return self.__airports.values()
+
+    def flights(self) -> list[Flight]:
+        return self.__flights
+
+    def airport_find(self, airport_code: str) -> Airport:
         try:
-            return self.airports[airport_code]
+            airport = self.__airports[airport_code]
+            return airport
         except KeyError:
-                return None   
+            print(f"The airport {airport_code} haven't been found !")
+            return None  
 
-    def flight_exist(self, src_airport_code, dst_airport_code):
-        return (src_airport_code, dst_airport_code) in self.flights
+    def flight_exist(self, src_airport_code, dst_airport_code: str) -> bool:
+        for flight in self.__flights:
+            if flight.src_code == src_airport_code \
+                and flight.dst_code == dst_airport_code:
+                return True
+            else : 
+                return False	
         
 
-    def flights_where(self, airport_code):
-        flights_list = []
-        for flight in self.flights.values():
+    def flights_where(self, airport_code: str) -> list[Flight]:
+        flights = []
+        for flight in self.__flights:
             if flight.src_code == airport_code or flight.dst_code == airport_code:
-                flights_list.append(flight)
-            return flights_list
+                flights.append(flight)
+                
+        return flights
 
-    def airports_from(self, airport_code):
-        airports_list = []
-        for flight in self.flights_where(airport_code):
+    def airports_from(self, airport_code: str) -> list[Airport]:
+        destinations = []
+
+        for flight in self.__flights:
+
             if flight.src_code == airport_code:
-                airports_list.append(self.airport_find(flight.dst_code))
-        else:
-            airports_list.append(self.airport_find(flight.src_code))
-            return airports_list  
+                airport = self.__airports[flight.dst_code]
+            elif flight.dst_code == airport_code:
+                    airport =  self.__airports[flight.src_code]
+            else : 
+                    continue
+
+        if airport not in destinations:
+            print(airport.code)
+            destinations.append(airport)
+
+            return destinations 
             
 
     def paths(self, src_airport_code, dst_airport_code):
