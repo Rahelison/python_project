@@ -1,19 +1,20 @@
-from flight_map import FlightMap 
+from airport import Airport
+from flight_map import FlightMap
+# a = Airport("Paris Charles de Gaulle", "CDG", 49.012779, 2.55)
 
-# Création de l'objet FlightMap
-f = FlightMap()
+# print(a.name, a.code, a.lat, a.long) 
 
-# Chargement des aéroports depuis le fichier airports.csv
-f.import_airports('airports.csv')
+class Test:
 
-# Chargement des vols depuis le fichier flights.csv
-f.import_flights('flights.csv')
+    def setup_method(self):
+        self.flight_map = FlightMap()
 
-# Accès à la liste des aéroports
-print(f.airport())
+    def test_import_airports(self):
+        self.flight_map.import_airports('airports.csv')
+        assert len(self.flight_map.airports) == 3
 
-# Accès à la liste des vols
-print(f.flights())
+    def test_import_flights(self):
+        self.flight_map.import_flights('flights.csv')
+        assert len(self.flight_map.flights) == 3
 
-
-print(str(f.airport_find("SYD")))
+    

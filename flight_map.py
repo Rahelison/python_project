@@ -1,130 +1,251 @@
-from typing import List
 import csv
 from airport import Airport
 from flight import Flight
-from flight_Path_broken import FlightPathBroken
-from flight_path_duplicate import FlightPathDuplicate
-
+from flight_path import FlightPath
 
 
 class FlightMap:
     def __init__(self):
-        self.airports = []
-        self.flights = []
+        self.airports = {}
+        self.flights = {}
     
-    def import_airports(self, csv_file: str) -> None:
-        with open(csv_file,'r') as f:
-            reader = csv.reader(f,  delimiter=' ', quotechar='"')
-            next(reader)
-
-            for row in reader:
-                name, code, lat, long = row
-                lat, long = float(lat.replace(","," ")), float(long)
-                code=code.replace(",","")
-                airport = Airport(name, code, lat, long)
-                self.airports.append(airport)
-    
-    def import_flights(self, csv_file: str) -> None:
+    def import_airports(self, csv_file):
         with open(csv_file, 'r') as f:
-            reader = csv.reader(f, delimiter=' ', quotechar='"')
-            next(reader)  
+            reader = csv.reader(f)
             for row in reader:
-                src_code, dst_code, duration = row
-                src_code,dst_code=src_code.replace(",",""),dst_code.replace(",","")
-                duration = float(duration)
-                flight = Flight(src_code, dst_code, duration)
-                self.flights.append(flight)
+                # On crée un objet Airport avec les données lues
+                airport = Airport(row[0], row[1], row[2], row[3])
+                # On ajoute l'aéroport à la collection d'aéroports
+                self.airports[row[0]] = airport
+    
+    def import_flights(self, csv_file):
+        with open(csv_file, 'r') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                # On créé un objet Flight avec les données lues
+                flight = Flight(row[0], row[1], float(row[2]))
+                # On ajoute le vol à la collection de vols
+                self.flights[(row[0])] = flight
 
-    #  liste des aéroports
     def airports(self):
-        return self.airports
-    
-    # list des flights
+        return list(self.airports.values())
+
     def flights(self):
-        return self.flights
-    
-    # Recherches simple d'aéroport par code
-    def airport_find(self, airport_code: str) -> Airport:
-        for airport in self.airports:
-            if airport.code == airport_code:
-                return airport
-        return None
-    
-    # Vol direct entre deux aéroports
-    def flight_exist(self, src_airport_code: str, dst_airport_code: str) -> bool:
-        for flight in self.flights:
-            if flight.src_code == src_airport_code and flight.dst_code == dst_airport_code:
-                return True
-        return False
-    
-    #  Recherche des vols et aéroports accessibles à partir d'une ville donné
-    def flights_where(self, airport_code: str) -> list[Flight]:
-        return [flight for flight in self.flights if flight.src_code == airport_code or flight.dst_code == airport_code]
-    
-    def airports_from(self, airport_code: str) -> list[Airport]:
-        flights = self.flights_where(airport_code)
-        airport_codes = {flight.dst_code for flight in flights}
-        return [self.airport_find(code) for code in airport_codes]
+        return list(self.flights.values())
 
+    def airport_find(self, airport_code):
+        try:
+            return self.airports[airport_code]
+        except KeyError:
+                return None   
 
-class FlightPath:
-    def __init__(self, src_airport: Airport) -> None:
-        self.path = [src_airport]
-        self.flights = []
+    def flight_exist(self, src_airport_code, dst_airport_code):
+        return (src_airport_code, dst_airport_code) in self.flights
+        
 
-# Initialise votre chemin avec l'aéroport de départ.
-    def add(self, dst_airport: Airport, via_flight: Flight) -> None:
-        if dst_airport not in self.path[-1].destinations:
-            raise FlightPathBroken("L'aéroport {} n'est pas la destination du dernier aéroport {} sur le chemin".format(dst_airport, self.path[-1]))
-        if dst_airport in self.path:
-            raise FlightPathDuplicate("L'aéroport {} est déjà sur le chemin".format(dst_airport))
-        self.path.append(dst_airport)
-        self.flights.append(via_flight)
+    def flights_where(self, airport_code):
+        flights_list = []
+        for flight in self.flights.values():
+            if flight.src_code == airport_code or flight.dst_code == airport_code:
+                flights_list.append(flight)
+            return flights_list
 
-    def flights(self) -> List[Flight]:
-        return self.flights
+    def airports_from(self, airport_code):
+        airports_list = []
+        for flight in self.flights_where(airport_code):
+            if flight.src_code == airport_code:
+                airports_list.append(self.airport_find(flight.dst_code))
+        else:
+            airports_list.append(self.airport_find(flight.src_code))
+            return airports_list  
+            
 
-    def airports(self) -> List[Airport]:
-        return self.path
-
-    def steps(self) -> float:
-        return len(self.flights)
-
-    def duration(self) -> float:
-        return sum(flight.duration for flight in self.flights)
-
-class FlightMap:
-    def __init__(self, flights: List[Flight]) -> None:
-        self.flights = flights
-        self.airports = {flight.src for flight in flights} | {flight.dst for flight in flights}
-
-    def paths(self, src_airport_code: str, dst_airport_code: str) -> List[FlightPath]:
-        src_airport = self._get_airport(src_airport_code)
-        dst_airport = self._get_airport(dst_airport_code)
-        if src_airport is None or dst_airport is None:
-            return []
-
-        paths = []
-        airports_not_visited = {airport for airport in self.airports}
-        airports_future = {src_airport}
+    def paths(self, src_airport_code, dst_airport_code):
+        # Initialisation
+        airports_not_visited = set(self.airports.keys())
+        airports_future = set()
         airports_visited = set()
+        FlightPaths = []
+
+        # Ajout du point de départ à la liste des aéroports à visiter
+        airports_future.add(src_airport_code)
+        
+        # Tant qu'il reste des villes à visiter
         while airports_future:
+            # On prend l'aéroport à visiter
             airport = airports_future.pop()
-            airports_not_visited.remove(airport)
+            
+            # On l'ajoute à la liste des aéroports visités
             airports_visited.add(airport)
-            if airport == dst_airport:
-                paths.append(self._construct_path(src_airport, airport, airports_visited))
-            else:
-                for flight in self._get_outgoing_flights(airport):
-                    if flight.dst in airports_not_visited:
-                        airports_future.add(flight.dst)
-        return paths
+            
+            # On enlève l'aéroport de la liste des aéroports non visités
+            airports_not_visited.remove(airport)
+            
+            # On récupère les vols partant de l'aéroport
+            flights = self.flights_from(airport)
+            
+            for flight in flights:
+                # On ajoute la destination de chaque vol à la liste des aéroports à visiter
+                if flight.dst_airport_code not in airports_future:
+                    airports_future.add(flight.dst_airport_code)
+                    
+                # On enlève la destination de chaque vol de la liste des aéroports non visités
+                if flight.dst_airport_code in airports_not_visited:
+                    airports_not_visited.remove(flight.dst_airport_code)
+                    
+                # On ajoute le vol à la liste des chemins possibles
+                FlightPaths.append(FlightPath(flight))
+                
+            # Si on a trouvé la destination, on arrête la boucle
+            if dst_airport_code in airports_future:
+                break
+        
+        return FlightPaths
 
-    def paths_shortest_length(self, src_airport_code: str, dst_airport_code: str) -> List[FlightPath]:
-        paths = self.paths(src_airport_code, dst_airport_code)
-        return [path for path in paths if path.steps() == min(path.steps() for path in paths)]
+    def paths_shortest_length(self, src_airport_code, dst_airport_code):
+        # Initialisation
+        airports_not_visited = set(self.airports.keys())
+        airports_future = set()
+        airports_visited = set()
+        FlightPaths = []
+        shortest_paths = []
 
-    def paths_shortest_duration(self, src_airport_code: str, dst_airport_code: str) ->List[FlightPath]:
-        paths = self.path(src_airport_code, dst_airport_code)
-        return[ path for path in paths if path.steps() == min(path.steps() for path in paths)]
+        # Ajout du point de départ à la liste des aéroports à visiter
+        airports_future.add(src_airport_code)
+        
+        # Tant qu'il reste des villes à visiter
+        while airports_future:
+            # On prend l'aéroport à visiter
+            airport = airports_future.pop()
+            
+            # On l'ajoute à la liste des aéroports visités
+            airports_visited.add(airport)
+            
+            # On enlève l'aéroport de la liste des aéroports non visités
+            airports_not_visited.remove(airport)
+            
+            # On récupère les vols partant de l'aéroport
+            flights = self.flights_from(airport)
+            
+            for flight in flights:
+                # On ajoute la destination de chaque vol à la liste des aéroports à visiter
+                if flight.dst_airport_code not in airports_future:
+                    airports_future.add(flight.dst_airport_code)
+                    
+                # On enlève la destination de chaque vol de la liste des aéroports non visités
+                if flight.dst_airport_code in airports_not_visited:
+                    airports_not_visited.remove(flight.dst_airport_code)
+                    
+                # On ajoute le vol à la liste des chemins possibles
+                FlightPaths.append(FlightPath(flight))
+                
+            # Si on a trouvé la destination, on arrête la boucle
+            if dst_airport_code in airports_future:
+                # On calcule la longueur du chemin
+                path_length = len(airports_visited)
+                
+                # On ajoute le chemin à la liste des chemins minimaux
+                if shortest_paths == [] or len(shortest_paths[0]) == path_length:
+                    shortest_paths.append(FlightPaths)
+                elif len(shortest_paths[0]) > path_length:
+                    shortest_paths = [FlightPaths]
+                    
+                # On réinitialise les variables
+                FlightPaths = []
+                airports_future = set()
+                airports_visited = set()
+        
+        # On retourne la liste des chemins minimaux
+        return shortest_paths
+
+
+    def paths_shortest_duration(self, src_airport_code, dst_airport_code):
+        # Initialisation
+        airports_not_visited = set(self.airports.keys())
+        airports_future = set()
+        airports_visited = set()
+        FlightPaths = []
+        shortest_paths = []
+
+        # Ajout du point de départ à la liste des aéroports à visiter
+        airports_future.add(src_airport_code)
+        
+        # Tant qu'il reste des villes à visiter
+        while airports_future:
+            # On prend l'aéroport à visiter
+            airport = airports_future.pop()
+            
+            # On l'ajoute à la liste des aéroports visités
+            airports_visited.add(airport)
+            
+            # On enlève l'aéroport de la liste des aéroports non visités
+            airports_not_visited.remove(airport)
+            
+            # On récupère les vols partant de l'aéroport
+            flights = self.flights_from(airport)
+            
+            for flight in flights:
+                # On ajoute la destination de chaque vol à la liste des aéroports à visiter
+                if flight.dst_airport_code not in airports_future:
+                    airports_future.add(flight.dst_airport_code)
+                    
+                # On enlève la destination de chaque vol de la liste des aéroports non visités
+                if flight.dst_airport_code in airports_not_visited:
+                    airports_not_visited.remove(flight.dst_airport_code)
+                    
+                # On ajoute le vol à la liste des chemins possibles
+                FlightPaths.append(FlightPath(flight))
+                
+            # Si on a trouvé la destination, on arrête la boucle
+            if dst_airport_code in airports_future:
+                # On calcule la durée du chemin
+                path_duration = sum([f.duration for f in FlightPaths])
+                
+                # On ajoute le chemin à la liste des chemins minimaux
+                if shortest_paths == [] or shortest_paths[0].duration == path_duration:
+                    shortest_paths.append(FlightPaths)
+                elif shortest_paths[0].duration > path_duration:
+                    shortest_paths = [FlightPaths]
+                    
+                # On réinitialise les variables
+                FlightPaths = []
+                airports_future = set()
+                airports_visited = set()
+        
+        # On retourne la liste des chemins minimaux
+        return shortest_paths
+
+
+    def paths_via(self, src_airport_code, dst_airport_code, via_airport_code):
+        # Initialisation
+        FlightPaths = []
+        via_paths = []
+        
+        # On vérifie que le vol direct existe
+        if self.flight_exist(src_airport_code, via_airport_code):
+            # On récupère les chemins possibles depuis le point de départ jusqu'à l'escale
+            src_via_paths = self.paths(src_airport_code, via_airport_code)
+            
+            # On récupère les chemins possibles depuis l'escale jusqu'à la destination
+            via_dst_paths = self.paths(via_airport_code, dst_airport_code)
+            
+            # Pour chaque chemin depuis le point de départ jusqu'à l'escale
+            for src_via_path in src_via_paths:
+                # On récupère les vols qui composent le chemin
+                src_via_flights = src_via_path.flights
+                
+                # Pour chaque chemin depuis l'escale jusqu'à la destination
+                for via_dst_path in via_dst_paths:
+                    # On récupère les vols qui composent le chemin
+                    via_dst_flights = via_dst_path.flights
+                    
+                    # On crée un nouveau chemin à partir des vols des deux chemins
+                    new_path = FlightPath(*src_via_flights + via_dst_flights)
+                    
+                    # On ajoute le nouveau chemin à la liste des chemins possibles
+                    via_paths.append(new_path)
+            
+        # On retourne la liste des chemins
+        return via_paths
+
 
